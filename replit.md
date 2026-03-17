@@ -1,8 +1,8 @@
-# Workspace
+# ETR Gem Mining App
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Full-stack fantasy treasure-themed gem mining and crypto-style token platform. Users deposit USDT, earn Gems through mining, and convert them to ETR tokens or USDT.
 
 ## Stack
 
@@ -14,83 +14,80 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
+- **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
+- **Auth**: JWT (bcrypt passwords, jsonwebtoken)
 - **Build**: esbuild (CJS bundle)
 
 ## Structure
 
 ```text
 artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
+├── artifacts/
+│   ├── api-server/         # Express API server
+│   └── gem-mining/         # React + Vite frontend
+├── lib/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
 │   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+├── scripts/                # Utility scripts
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+├── tsconfig.json
+└── package.json
 ```
 
-## TypeScript & Composite Projects
+## Admin Access
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+- Default admin username: `admin`, password: `admin123`
+- Admin flag set directly in DB (`is_admin = true`)
+- Admin panel accessible via `/admin` route when logged in as admin
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+## Key Features
 
-## Root Scripts
+1. **Authentication**: JWT-based, bcrypt password hashing, recovery question/answer
+2. **Deposits**: USDT deposits with manual admin approval (~2 hours)
+3. **Mining**: Gems accumulate continuously after deposit approval
+   - $100 deposit → 10,000,000 gems over 180 days (~55,555/day)
+4. **Conversion**:
+   - 10,000,000 gems = 100 ETR = $350 USDT
+   - Dynamic rate kicks in after 1M ETR swapped (rate doubles)
+5. **Referral System**: 2-level (15% L1, 5% L2) gem rewards
+6. **ETR Wallet**: ETR transferable between users; USDT balance tracked
+7. **Withdrawals**: Manual admin approval required
+8. **Admin Panel**: Manage users, deposits, withdrawals + system stats
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+## Database Schema
 
-## Packages
+- `users` — user accounts with balances, mining state
+- `deposits` — USDT deposit requests (pending/approved/rejected)
+- `conversions` — gem conversion history
+- `withdrawals` — withdrawal requests
+- `system_config` — key-value store (e.g., `total_etr_swapped`)
 
-### `artifacts/api-server` (`@workspace/api-server`)
+## Mining Constants (lib/api-server/src/lib/mining.ts)
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+- `GEMS_PER_100_USDT` = 10,000,000
+- `MINING_PERIOD_DAYS` = 180
+- `DAILY_GEMS_PER_100_USDT` ≈ 55,555
+- `GEMS_PER_ETR_NORMAL` = 100,000 (10M gems = 100 ETR)
+- `GEMS_PER_ETR_DYNAMIC` = 200,000 (after 1M ETR swapped)
+- `ETR_TOTAL_SUPPLY` = 21,000,000
 
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+## API Routes
 
-### `lib/db` (`@workspace/db`)
-
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
-
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+All routes under `/api`:
+- `POST /auth/signup` — register
+- `POST /auth/login` — login (returns JWT)
+- `GET /auth/me` — get current user
+- `POST /auth/recovery` — reset password via recovery answer
+- `GET/POST /deposits` — user deposits
+- `GET /mining/status` — current mining state
+- `POST /mining/claim` — claim pending gems
+- `GET/POST /conversions` — gem conversion
+- `GET /wallet` — balance summary
+- `POST /wallet/transfer` — ETR transfer between users
+- `GET /referrals` — referral tree info
+- `GET/POST /withdrawals` — withdrawal requests
+- `GET /system/stats` — public system stats
+- `GET /admin/*` — admin endpoints (require isAdmin)

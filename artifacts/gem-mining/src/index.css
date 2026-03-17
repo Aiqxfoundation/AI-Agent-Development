@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --font-display: 'Cinzel', serif;
+  --font-sans: 'Outfit', sans-serif;
+}
+
+:root {
+  --background: 265 50% 5%;
+  --foreground: 45 100% 90%;
+  --card: 265 40% 8%;
+  --card-foreground: 45 100% 90%;
+  --border: 45 50% 25%;
+  --input: 265 40% 12%;
+  --primary: 45 100% 50%;
+  --primary-foreground: 265 50% 5%;
+  --muted: 265 30% 15%;
+  --muted-foreground: 265 20% 65%;
+  --accent: 280 80% 60%;
+  --accent-foreground: 45 100% 95%;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground font-sans antialiased min-h-screen;
+    background-image: 
+      radial-gradient(circle at 10% 40%, rgba(251, 191, 36, 0.05), transparent 35%),
+      radial-gradient(circle at 90% 60%, rgba(168, 85, 247, 0.08), transparent 35%);
+    background-attachment: fixed;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-wide;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-card/80 backdrop-blur-xl border border-primary/20 shadow-[0_4px_30px_rgba(0,0,0,0.5)] relative overflow-hidden;
+  }
+  .glass-panel::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none;
+  }
+  .text-glow {
+    text-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+  }
+  .gold-gradient-text {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-primary to-amber-600;
+  }
+}
