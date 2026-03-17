@@ -1,6 +1,6 @@
 import React from "react";
 import { Card } from "@/components/ui";
-import { formatCurrency, formatGems } from "@/lib/utils";
+import { cn, formatCurrency, formatGems } from "@/lib/utils";
 import { useGetWallet, useGetMiningStatus, useGetSystemStats } from "@workspace/api-client-react";
 import { Pickaxe, Gem, Coins, Activity } from "lucide-react";
 
