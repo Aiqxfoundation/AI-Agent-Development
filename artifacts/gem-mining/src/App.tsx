@@ -113,8 +113,8 @@ export default function App() {
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
         <Router />
       </WouterRouter>
-      <Toaster theme="dark" position="top-center" richColors toastOptions={{
-        style: { background: 'hsl(265 40% 12%)', border: '1px solid hsl(45 50% 25%)', color: 'white' }
+      <Toaster theme="dark" position="top-right" richColors toastOptions={{
+        style: { background: 'hsl(220 12% 10%)', border: '1px solid hsl(220 12% 16%)', color: 'hsl(220 9% 92%)' }
       }} />
     </QueryClientProvider>
   );

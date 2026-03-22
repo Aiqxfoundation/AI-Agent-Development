@@ -8,6 +8,8 @@ import { cn, formatGems } from "@/lib/utils";
 import { useGetWallet, useLogout } from "@workspace/api-client-react";
 import type { UserProfile } from "@workspace/api-client-react";
 
+import { Badge } from "./ui";
+
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/deposit", label: "Deposit USDT", icon: ArrowDownCircle },
@@ -42,13 +44,13 @@ export function Layout({ children, user }: { children: React.ReactNode, user: Us
         return (
           <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
             className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium",
+              "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 font-medium",
               active 
-                ? "bg-primary/20 text-primary border border-primary/30 shadow-[0_0_15px_rgba(251,191,36,0.1)]" 
-                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                ? "bg-primary/10 text-primary border-l-2 border-primary" 
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             )}
           >
-            <item.icon size={20} className={active ? "text-primary" : ""} />
+            <item.icon size={20} className={cn("w-5 h-5", active ? "text-primary" : "text-muted-foreground")} />
             {item.label}
           </Link>
         );
@@ -56,13 +58,13 @@ export function Layout({ children, user }: { children: React.ReactNode, user: Us
       {user.isAdmin && (
         <Link href="/admin" onClick={() => setMobileOpen(false)}
           className={cn(
-            "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium mt-4",
+            "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 font-medium mt-1",
             location === "/admin"
-              ? "bg-accent/20 text-accent border border-accent/30 shadow-[0_0_15px_rgba(168,85,247,0.2)]" 
-              : "text-accent/70 hover:bg-accent/10 hover:text-accent"
+              ? "bg-primary/10 text-primary border-l-2 border-primary" 
+              : "text-muted-foreground hover:bg-secondary hover:text-foreground"
           )}
         >
-          <ShieldAlert size={20} />
+          <ShieldAlert size={20} className={cn("w-5 h-5", location === "/admin" ? "text-primary" : "text-muted-foreground")} />
           Admin Panel
         </Link>
       )}
@@ -78,55 +80,71 @@ export function Layout({ children, user }: { children: React.ReactNode, user: Us
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 bg-card/95 border-r border-primary/20 backdrop-blur-2xl transform transition-transform duration-300 flex flex-col md:translate-x-0 md:static",
+        "fixed inset-y-0 left-0 z-50 w-[260px] bg-card border-r border-border transform transition-transform duration-300 flex flex-col md:translate-x-0 md:static",
         mobileOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="p-6 flex items-center justify-between border-b border-primary/10">
-          <div className="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
-            <h1 className="font-display text-xl font-bold gold-gradient-text tracking-wider">ETR Mining</h1>
+        <div className="p-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-8 h-8 object-contain" />
+            <div className="flex items-baseline gap-1">
+              <span className="font-bold text-foreground text-lg">ETR</span>
+              <span className="text-muted-foreground text-sm">Mining</span>
+            </div>
           </div>
           <button className="md:hidden text-muted-foreground" onClick={() => setMobileOpen(false)}>
             <X size={24} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          <div className="px-4 py-3 mb-4 rounded-xl bg-black/30 border border-primary/10">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">Gems Balance</p>
-            <p className="text-2xl font-display text-primary text-glow">{wallet ? formatGems(wallet.gemsBalance) : "..."}</p>
-          </div>
+        <div className="flex-1 overflow-y-auto px-3 custom-scrollbar">
           <NavLinks />
         </div>
 
-        <div className="p-4 border-t border-primary/10">
-          <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors font-medium">
-            <LogOut size={20} /> Logout
-          </button>
+        <div className="mt-auto">
+          <div className="bg-secondary/50 rounded-lg p-3 mx-3 mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-foreground text-sm truncate">{user.username}</span>
+              <Badge variant={user.isActive ? "success" : "warning"}>
+                {user.isActive ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Gems Balance</span>
+              <span className="text-primary font-mono text-sm font-bold">
+                {wallet ? formatGems(wallet.gemsBalance) : "..."}
+              </span>
+            </div>
+          </div>
+          
+          <div className="px-3 pb-6">
+            <button onClick={handleLogout} className="flex w-full items-center gap-2 px-3 py-2 text-red-400 hover:text-red-300 transition-colors text-sm font-medium">
+              <LogOut size={18} /> Logout
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Mobile Header */}
-        <header className="md:hidden flex items-center justify-between p-4 border-b border-primary/20 bg-card/80 backdrop-blur-md sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+        <header className="md:hidden flex items-center justify-between p-4 border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-30">
+          <div className="flex items-center gap-2">
             <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-8 h-8 object-contain" />
-            <span className="font-display font-bold text-primary">ETR</span>
+            <span className="font-bold text-foreground">ETR</span>
           </div>
-          <button onClick={() => setMobileOpen(true)} className="text-primary p-1">
+          <button onClick={() => setMobileOpen(true)} className="text-foreground p-1">
             <Menu size={28} />
           </button>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative">
           {!user.isActive && !user.isAdmin && (
-            <div className="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4">
+            <div className="mb-8 p-4 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-between gap-4">
               <div>
-                <h3 className="font-bold text-amber-400 text-lg">Account Inactive</h3>
-                <p className="text-amber-200/70 text-sm mt-1">Make your first USDT deposit to activate mining and unlock all features.</p>
+                <h3 className="font-bold text-orange-500">Account Inactive</h3>
+                <p className="text-muted-foreground text-sm mt-1">Make your first USDT deposit to activate mining and unlock all features.</p>
               </div>
-              <Link href="/deposit" className="shrink-0 px-4 py-2 bg-amber-500 text-black font-bold rounded-lg hover:bg-amber-400 transition-colors">
+              <Link href="/deposit" className="shrink-0 px-4 py-2 bg-orange-500 text-white text-sm font-bold rounded-md hover:bg-orange-600 transition-colors">
                 Deposit Now
               </Link>
             </div>

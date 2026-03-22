@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Card, Button, Input, Label } from "@/components/ui";
+import { Card, Button, Input, Label, StatCard } from "@/components/ui";
 import { useGetWallet, useTransferEtr } from "@workspace/api-client-react";
 import { formatCurrency, formatGems } from "@/lib/utils";
-import { Send, Wallet as WalletIcon } from "lucide-react";
+import { Send, Wallet as WalletIcon, Coins, Gem, DollarSign } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Wallet() {
   const [toUsername, setToUsername] = useState("");
@@ -16,7 +17,10 @@ export default function Wallet() {
 
   const handleTransfer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (Number(amount) <= 0) return toast.error("Enter a valid amount");
+    if (Number(amount) <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
 
     transfer({ data: { toUsername, amount: Number(amount) } }, {
       onSuccess: () => {
@@ -34,56 +38,80 @@ export default function Wallet() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto">
       <header>
-        <h1 className="text-4xl font-display font-bold gold-gradient-text text-glow">Treasury</h1>
-        <p className="text-muted-foreground mt-2">Manage your assets and transfer ETR to other miners.</p>
+        <h1 className="text-3xl font-bold text-foreground">Wallet</h1>
+        <p className="text-muted-foreground mt-1">Manage your assets and transfer ETR to other miners.</p>
       </header>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="p-6 bg-gradient-to-br from-card to-card border-t-4 border-t-primary">
-          <p className="text-sm font-semibold text-muted-foreground mb-2">Gems Balance</p>
-          <p className="text-3xl font-display text-primary">{wallet ? formatGems(wallet.gemsBalance) : 0}</p>
-        </Card>
-        <Card className="p-6 bg-gradient-to-br from-card to-card border-t-4 border-t-accent">
-          <p className="text-sm font-semibold text-muted-foreground mb-2">ETR Balance</p>
-          <p className="text-3xl font-display text-accent">{wallet?.etrBalance.toFixed(4) || 0}</p>
-        </Card>
-        <Card className="p-6 bg-gradient-to-br from-card to-card border-t-4 border-t-emerald-500">
-          <p className="text-sm font-semibold text-muted-foreground mb-2">USDT Balance</p>
-          <p className="text-3xl font-display text-emerald-400">{wallet ? formatCurrency(wallet.usdtBalance) : 0}</p>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard 
+          title="Gems Balance" 
+          value={wallet ? formatGems(wallet.gemsBalance) : "0"} 
+          icon={<Gem size={20} />} 
+          className="border-t-4 border-t-primary"
+        />
+        <StatCard 
+          title="ETR Balance" 
+          value={wallet?.etrBalance.toFixed(4) || "0.0000"} 
+          icon={<Coins size={20} />} 
+          className="border-t-4 border-t-accent"
+          color="text-accent"
+        />
+        <StatCard 
+          title="USDT Balance" 
+          value={wallet ? formatCurrency(wallet.usdtBalance) : "$0.00"} 
+          icon={<DollarSign size={20} />} 
+          className="border-t-4 border-t-emerald-500"
+          color="text-emerald-500"
+        />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8 mt-8">
-        <Card className="p-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl" />
-          <h2 className="text-2xl font-display text-white mb-6 flex items-center gap-3">
-            <Send className="text-accent" /> Transfer ETR
+      <div className="grid md:grid-cols-2 gap-8">
+        <Card className="p-8">
+          <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+            <Send size={20} className="text-primary" /> Transfer ETR
           </h2>
-          <form onSubmit={handleTransfer} className="space-y-5 relative z-10">
+          <form onSubmit={handleTransfer} className="space-y-5">
             <div>
               <Label>Recipient Username</Label>
-              <Input value={toUsername} onChange={e => setToUsername(e.target.value)} required placeholder="e.g. miner123" />
+              <Input 
+                value={toUsername} 
+                onChange={e => setToUsername(e.target.value)} 
+                required 
+                placeholder="Enter username" 
+              />
             </div>
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between mb-1">
                 <Label>Amount (ETR)</Label>
                 <span className="text-xs text-muted-foreground">Available: {wallet?.etrBalance || 0}</span>
               </div>
-              <Input type="number" step="0.0001" min="0.0001" value={amount} onChange={e => setAmount(e.target.value)} required placeholder="0.00" />
+              <Input 
+                type="number" 
+                step="0.0001" 
+                min="0.0001" 
+                value={amount} 
+                onChange={e => setAmount(e.target.value)} 
+                required 
+                placeholder="0.00" 
+              />
             </div>
-            <Button type="submit" className="w-full h-12 text-lg bg-accent hover:bg-accent/80 text-white shadow-accent/20" disabled={isPending}>
+            <Button type="submit" className="w-full" disabled={isPending}>
               {isPending ? "Sending..." : "Send ETR"}
             </Button>
           </form>
         </Card>
 
-        <Card className="p-8 flex flex-col items-center justify-center text-center bg-black/20 border-dashed border-2 border-primary/30">
-          <WalletIcon size={64} className="text-primary/40 mb-6" />
-          <h3 className="text-xl font-display text-white mb-2">Withdraw to External Wallet</h3>
-          <p className="text-muted-foreground mb-6 max-w-sm">Ready to cash out? Head to the withdrawal section to transfer ETR or USDT to your external crypto wallet.</p>
-          <a href="/withdraw" className="px-6 py-2 border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors">
-            Go to Withdrawals
-          </a>
+        <Card className="p-8 flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+            <WalletIcon size={32} className="text-primary" />
+          </div>
+          <h3 className="text-xl font-bold text-foreground mb-2">Withdraw Assets</h3>
+          <p className="text-muted-foreground mb-6 max-w-xs">Transfer your ETR or USDT to an external crypto wallet.</p>
+          <Link href="/withdraw">
+            <Button variant="outline" className="w-full">
+              Go to Withdrawals
+            </Button>
+          </Link>
         </Card>
       </div>
     </div>

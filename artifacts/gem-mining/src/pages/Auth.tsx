@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLogin, useSignup, useRecoverPassword } from "@workspace/api-client-react";
 import { Button, Input, Card, Label } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 export default function Auth({ mode: initialMode }: { mode: 'login' | 'signup' | 'recovery' }) {
   const [mode, setMode] = useState(initialMode);
@@ -37,7 +38,10 @@ export default function Auth({ mode: initialMode }: { mode: 'login' | 'signup' |
 
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.password !== form.confirmPassword) return toast.error("Passwords do not match");
+    if (form.password !== form.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
     signup({ data: form }, {
       onSuccess: (res) => {
         localStorage.setItem('etr_token', res.token);
@@ -61,46 +65,73 @@ export default function Auth({ mode: initialMode }: { mode: 'login' | 'signup' |
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative bg-background p-4">
-      {/* Background Image */}
-      <div className="absolute inset-0 z-0">
-        <img src={`${import.meta.env.BASE_URL}images/hero-bg.png`} alt="Background" className="w-full h-full object-cover opacity-15" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
+    <div className="min-h-screen flex items-center justify-center relative bg-background p-4 overflow-hidden">
+      {/* Background Watermark */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+        <img 
+          src={`${import.meta.env.BASE_URL}images/logo-icon.png`} 
+          alt="" 
+          className="w-[600px] h-[600px] object-contain opacity-[0.03] rotate-12" 
+        />
       </div>
 
-      <Card className="w-full max-w-md p-8 z-10 border-primary/40 shadow-[0_0_40px_rgba(251,191,36,0.15)] relative overflow-visible">
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2">
-          <div className="w-24 h-24 rounded-full bg-card border-4 border-primary/30 flex items-center justify-center shadow-[0_0_30px_rgba(251,191,36,0.3)]">
-            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-16 h-16 object-contain" />
+      <Card className="w-full max-w-md p-8 z-10 border-border shadow-xl relative">
+        <div className="flex flex-col items-center mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <img src={`${import.meta.env.BASE_URL}images/logo-icon.png`} alt="Logo" className="w-10 h-10 object-contain" />
+            <h1 className="text-xl font-bold text-foreground">ETR Mining</h1>
           </div>
-        </div>
-
-        <div className="mt-8 text-center mb-8">
-          <h1 className="text-3xl font-display font-bold gold-gradient-text text-glow">
-            {mode === 'login' ? 'Enter the Vault' : mode === 'signup' ? 'Begin Your Journey' : 'Recover Access'}
-          </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-muted-foreground text-sm">
             {mode === 'login' ? 'Login to your ETR mining account' : mode === 'signup' ? 'Create an account to start mining gems' : 'Reset your lost password'}
           </p>
         </div>
+
+        {/* Mode Switcher */}
+        {mode !== 'recovery' && (
+          <div className="flex gap-1 p-1 bg-secondary rounded-lg mb-6">
+            <button
+              onClick={() => setMode('login')}
+              className={cn(
+                "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all",
+                mode === 'login' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Login
+            </button>
+            <button
+              onClick={() => setMode('signup')}
+              className={cn(
+                "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all",
+                mode === 'signup' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Sign Up
+            </button>
+          </div>
+        )}
 
         {mode === 'login' && (
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <Label>Username</Label>
-              <Input name="username" value={form.username} onChange={handleChange} required />
+              <Input name="username" value={form.username} onChange={handleChange} required placeholder="Enter your username" />
             </div>
             <div>
-              <Label>Password</Label>
-              <Input type="password" name="password" value={form.password} onChange={handleChange} required />
+              <div className="flex justify-between items-center mb-1">
+                <Label className="mb-0">Password</Label>
+                <button 
+                  type="button" 
+                  onClick={() => setMode('recovery')} 
+                  className="text-xs text-primary hover:underline"
+                >
+                  Forgot?
+                </button>
+              </div>
+              <Input type="password" name="password" value={form.password} onChange={handleChange} required placeholder="••••••••" />
             </div>
-            <Button type="submit" className="w-full h-12 text-lg" disabled={isLoggingIn}>
+            <Button type="submit" className="w-full h-11" disabled={isLoggingIn}>
               {isLoggingIn ? 'Authenticating...' : 'Login'}
             </Button>
-            <div className="flex justify-between text-sm mt-4 text-primary/80">
-              <button type="button" onClick={() => setMode('recovery')} className="hover:text-primary hover:underline">Forgot password?</button>
-              <button type="button" onClick={() => setMode('signup')} className="hover:text-primary hover:underline">Create account</button>
-            </div>
           </form>
         )}
 
@@ -108,36 +139,33 @@ export default function Auth({ mode: initialMode }: { mode: 'login' | 'signup' |
           <form onSubmit={handleSignup} className="space-y-4">
             <div>
               <Label>Username</Label>
-              <Input name="username" value={form.username} onChange={handleChange} required />
+              <Input name="username" value={form.username} onChange={handleChange} required placeholder="Choose a username" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Password</Label>
-                <Input type="password" name="password" value={form.password} onChange={handleChange} required minLength={6} />
+                <Input type="password" name="password" value={form.password} onChange={handleChange} required minLength={6} placeholder="••••••••" />
               </div>
               <div>
-                <Label>Confirm Password</Label>
-                <Input type="password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} required minLength={6} />
+                <Label>Confirm</Label>
+                <Input type="password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} required minLength={6} placeholder="••••••••" />
               </div>
             </div>
             <div>
-              <Label>Recovery Question <span className="text-muted-foreground font-normal">(e.g. First pet's name)</span></Label>
-              <Input name="recoveryQuestion" value={form.recoveryQuestion} onChange={handleChange} required />
+              <Label>Recovery Question</Label>
+              <Input name="recoveryQuestion" value={form.recoveryQuestion} onChange={handleChange} required placeholder="e.g. First pet's name" />
             </div>
             <div>
               <Label>Recovery Answer</Label>
-              <Input name="recoveryAnswer" value={form.recoveryAnswer} onChange={handleChange} required />
+              <Input name="recoveryAnswer" value={form.recoveryAnswer} onChange={handleChange} required placeholder="Your answer" />
             </div>
             <div>
               <Label>Referral Code (Optional)</Label>
               <Input name="referredBy" value={form.referredBy} onChange={handleChange} placeholder="Username of referrer" />
             </div>
-            <Button type="submit" className="w-full h-12 text-lg mt-2" disabled={isSigningUp}>
+            <Button type="submit" className="w-full h-11 mt-2" disabled={isSigningUp}>
               {isSigningUp ? 'Creating Account...' : 'Sign Up'}
             </Button>
-            <div className="text-center text-sm mt-4 text-primary/80">
-              <button type="button" onClick={() => setMode('login')} className="hover:text-primary hover:underline">Already have an account? Login</button>
-            </div>
           </form>
         )}
 
@@ -145,21 +173,21 @@ export default function Auth({ mode: initialMode }: { mode: 'login' | 'signup' |
           <form onSubmit={handleRecovery} className="space-y-5">
             <div>
               <Label>Username</Label>
-              <Input name="username" value={form.username} onChange={handleChange} required />
+              <Input name="username" value={form.username} onChange={handleChange} required placeholder="Enter your username" />
             </div>
             <div>
               <Label>Recovery Answer</Label>
-              <Input name="recoveryAnswer" value={form.recoveryAnswer} onChange={handleChange} required />
+              <Input name="recoveryAnswer" value={form.recoveryAnswer} onChange={handleChange} required placeholder="Enter your answer" />
             </div>
             <div>
               <Label>New Password</Label>
-              <Input type="password" name="newPassword" value={form.newPassword} onChange={handleChange} required minLength={6} />
+              <Input type="password" name="newPassword" value={form.newPassword} onChange={handleChange} required minLength={6} placeholder="••••••••" />
             </div>
-            <Button type="submit" className="w-full h-12 text-lg" disabled={isRecovering}>
+            <Button type="submit" className="w-full h-11" disabled={isRecovering}>
               {isRecovering ? 'Resetting...' : 'Reset Password'}
             </Button>
-            <div className="text-center text-sm mt-4 text-primary/80">
-              <button type="button" onClick={() => setMode('login')} className="hover:text-primary hover:underline">Back to Login</button>
+            <div className="text-center text-sm mt-4">
+              <button type="button" onClick={() => setMode('login')} className="text-primary hover:underline">Back to Login</button>
             </div>
           </form>
         )}
