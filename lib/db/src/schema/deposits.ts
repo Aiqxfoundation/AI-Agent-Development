@@ -1,6 +1,4 @@
 import { pgTable, serial, integer, doublePrecision, text, timestamp } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
 
 export const depositsTable = pgTable("deposits", {
   id: serial("id").primaryKey(),
@@ -8,16 +6,11 @@ export const depositsTable = pgTable("deposits", {
   amountUsdt: doublePrecision("amount_usdt").notNull(),
   status: text("status").notNull().default("pending"), // pending | approved | rejected
   txHash: text("tx_hash"),
+  screenshotData: text("screenshot_data"), // base64 image data
+  assignedAddress: text("assigned_address"), // BSC address assigned to this deposit
   createdAt: timestamp("created_at").notNull().defaultNow(),
   approvedAt: timestamp("approved_at"),
 });
 
-export const insertDepositSchema = createInsertSchema(depositsTable).omit({
-  id: true,
-  createdAt: true,
-  approvedAt: true,
-  status: true,
-});
-
-export type InsertDeposit = z.infer<typeof insertDepositSchema>;
 export type Deposit = typeof depositsTable.$inferSelect;
+export type InsertDeposit = typeof depositsTable.$inferInsert;
