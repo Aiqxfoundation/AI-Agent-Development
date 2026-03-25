@@ -5,35 +5,40 @@ import { requireAuth } from "../lib/auth.js";
 
 const router = Router();
 
-// GET /deposits
+// GET /deposits — user's own deposit history
 router.get("/", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
-    const deposits = await db.select().from(depositsTable)
+    const deposits = await db
+      .select()
+      .from(depositsTable)
       .where(eq(depositsTable.userId, user.id))
       .orderBy(depositsTable.createdAt);
 
-    res.json(deposits.map(d => ({
-      id: d.id,
-      amountUsdt: d.amountUsdt,
-      status: d.status,
-      txHash: d.txHash,
-      assignedAddress: d.assignedAddress,
-      hasScreenshot: !!d.screenshotData,
-      screenshotData: d.screenshotData,
-      createdAt: d.createdAt.toISOString(),
-      approvedAt: d.approvedAt?.toISOString() ?? null,
-    })));
+    res.json(
+      deposits.map((d) => ({
+        id: d.id,
+        amountUsdt: d.amountUsdt,
+        status: d.status,
+        txHash: d.txHash,
+        assignedAddress: d.assignedAddress,
+        hasScreenshot: !!d.screenshotData,
+        screenshotData: d.screenshotData,
+        createdAt: d.createdAt.toISOString(),
+        approvedAt: d.approvedAt?.toISOString() ?? null,
+      }))
+    );
   } catch (err) {
     console.error("Get deposits error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// GET /deposits/generate-address — returns a random active BSC address
+// GET /deposits/generate-address — pick a random active BSC address from the pool
 router.get("/generate-address", requireAuth, async (_req, res) => {
   try {
-    const addresses = await db.select()
+    const addresses = await db
+      .select()
       .from(depositAddressesTable)
       .where(eq(depositAddressesTable.isActive, true));
 
@@ -55,13 +60,14 @@ router.get("/generate-address", requireAuth, async (_req, res) => {
   }
 });
 
-// POST /deposits
+// POST /deposits — submit a new deposit request
 router.post("/", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const { amountUsdt, txHash, screenshotData, assignedAddress } = req.body;
 
-    if (!amountUsdt || amountUsdt < 10) {
+    const amount = Number(amountUsdt);
+    if (!amount || amount < 10) {
       res.status(400).json({ error: "Minimum deposit is $10 USDT" });
       return;
     }
@@ -71,19 +77,39 @@ router.post("/", requireAuth, async (req, res) => {
       return;
     }
 
-    // Validate base64 screenshot size (max ~5MB base64)
-    if (screenshotData && screenshotData.length > 7 * 1024 * 1024) {
-      res.status(400).json({ error: "Screenshot file size too large. Maximum 5MB." });
+    // Validate txHash format if provided
+    if (txHash && typeof txHash !== "string") {
+      res.status(400).json({ error: "Invalid transaction hash" });
       return;
     }
 
-    const [deposit] = await db.insert(depositsTable).values({
-      userId: user.id,
-      amountUsdt,
-      txHash: txHash || null,
-      screenshotData: screenshotData || null,
-      assignedAddress: assignedAddress || null,
-    }).returning();
+    // Validate base64 screenshot — limit to ~5 MB (base64 expands ~33%)
+    if (screenshotData) {
+      if (typeof screenshotData !== "string") {
+        res.status(400).json({ error: "Invalid screenshot data" });
+        return;
+      }
+      if (screenshotData.length > 7 * 1024 * 1024) {
+        res.status(400).json({ error: "Screenshot is too large. Maximum 5 MB." });
+        return;
+      }
+      // Must be a valid data URL or base64
+      if (!screenshotData.startsWith("data:image/")) {
+        res.status(400).json({ error: "Invalid screenshot format. Must be an image." });
+        return;
+      }
+    }
+
+    const [deposit] = await db
+      .insert(depositsTable)
+      .values({
+        userId: user.id,
+        amountUsdt: amount,
+        txHash: txHash?.trim() || null,
+        screenshotData: screenshotData || null,
+        assignedAddress: assignedAddress?.trim() || null,
+      })
+      .returning();
 
     res.status(201).json({
       id: deposit.id,
@@ -101,13 +127,19 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /deposits/:id/screenshot — user deletes their own screenshot
+// DELETE /deposits/:id/screenshot — user removes their own screenshot from a pending deposit
 router.delete("/:id/screenshot", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const depositId = parseInt(req.params.id);
 
-    const [deposit] = await db.select()
+    if (isNaN(depositId)) {
+      res.status(400).json({ error: "Invalid deposit ID" });
+      return;
+    }
+
+    const [deposit] = await db
+      .select()
       .from(depositsTable)
       .where(and(eq(depositsTable.id, depositId), eq(depositsTable.userId, user.id)));
 
@@ -121,10 +153,7 @@ router.delete("/:id/screenshot", requireAuth, async (req, res) => {
       return;
     }
 
-    await db.update(depositsTable)
-      .set({ screenshotData: null })
-      .where(eq(depositsTable.id, depositId));
-
+    await db.update(depositsTable).set({ screenshotData: null }).where(eq(depositsTable.id, depositId));
     res.json({ message: "Screenshot removed" });
   } catch (err) {
     console.error("Delete screenshot error:", err);

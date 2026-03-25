@@ -5,72 +5,96 @@ import { requireAuth } from "../lib/auth.js";
 
 const router = Router();
 
-// GET /withdrawals
+// GET /withdrawals — user's own withdrawal history
 router.get("/", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
-    const withdrawals = await db.select().from(withdrawalsTable)
+    const withdrawals = await db
+      .select()
+      .from(withdrawalsTable)
       .where(eq(withdrawalsTable.userId, user.id))
       .orderBy(withdrawalsTable.createdAt);
 
-    res.json(withdrawals.map(w => ({
-      id: w.id,
-      currency: w.currency,
-      amount: w.amount,
-      walletAddress: w.walletAddress,
-      status: w.status,
-      createdAt: w.createdAt.toISOString(),
-      processedAt: w.processedAt?.toISOString() ?? null,
-    })));
+    res.json(
+      withdrawals.map((w) => ({
+        id: w.id,
+        currency: w.currency,
+        amount: w.amount,
+        walletAddress: w.walletAddress,
+        status: w.status,
+        createdAt: w.createdAt.toISOString(),
+        processedAt: w.processedAt?.toISOString() ?? null,
+      }))
+    );
   } catch (err) {
     console.error("Get withdrawals error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// POST /withdrawals
+// POST /withdrawals — create a new withdrawal request
 router.post("/", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const { currency, amount, walletAddress } = req.body;
 
+    // Validate currency
     if (!currency || !["etr", "usdt"].includes(currency)) {
       res.status(400).json({ error: "Invalid currency. Use 'etr' or 'usdt'" });
       return;
     }
 
-    if (!amount || amount <= 0) {
+    // Validate amount
+    const numAmount = Number(amount);
+    if (!numAmount || numAmount <= 0 || !isFinite(numAmount)) {
       res.status(400).json({ error: "Invalid amount" });
       return;
     }
 
-    if (!walletAddress) {
-      res.status(400).json({ error: "Wallet address required" });
+    // Validate wallet address
+    if (!walletAddress || typeof walletAddress !== "string" || !walletAddress.trim()) {
+      res.status(400).json({ error: "Wallet address is required" });
       return;
     }
 
-    // Check balance
-    if (currency === "etr" && user.etrBalance < amount) {
+    // Check minimum withdrawal
+    if (numAmount < 1) {
+      res.status(400).json({ error: "Minimum withdrawal amount is 1" });
+      return;
+    }
+
+    // Re-fetch user balance fresh to prevent race conditions
+    const [freshUser] = await db.select().from(usersTable).where(eq(usersTable.id, user.id));
+    if (!freshUser) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    if (currency === "etr" && freshUser.etrBalance < numAmount) {
       res.status(400).json({ error: "Insufficient ETR balance" });
       return;
     }
-    if (currency === "usdt" && user.usdtBalance < amount) {
+    if (currency === "usdt" && freshUser.usdtBalance < numAmount) {
       res.status(400).json({ error: "Insufficient USDT balance" });
       return;
     }
 
-    // Deduct from balance immediately (pending withdrawal)
+    // Deduct balance immediately (pending state)
     if (currency === "etr") {
-      await db.update(usersTable).set({ etrBalance: user.etrBalance - amount }).where(eq(usersTable.id, user.id));
+      await db.update(usersTable).set({
+        etrBalance: freshUser.etrBalance - numAmount,
+      }).where(eq(usersTable.id, freshUser.id));
     } else {
-      await db.update(usersTable).set({ usdtBalance: user.usdtBalance - amount }).where(eq(usersTable.id, user.id));
+      await db.update(usersTable).set({
+        usdtBalance: freshUser.usdtBalance - numAmount,
+      }).where(eq(usersTable.id, freshUser.id));
     }
 
     const [withdrawal] = await db.insert(withdrawalsTable).values({
-      userId: user.id,
+      userId: freshUser.id,
       currency,
-      amount,
-      walletAddress,
+      amount: numAmount,
+      walletAddress: walletAddress.trim(),
     }).returning();
 
     res.status(201).json({

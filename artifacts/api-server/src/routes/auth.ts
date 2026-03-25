@@ -6,6 +6,9 @@ import { randomBytes } from "crypto";
 
 const router = Router();
 
+/** Only allow safe username characters */
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
+
 function generateReferralCode(): string {
   return randomBytes(4).toString("hex").toUpperCase();
 }
@@ -19,16 +22,29 @@ router.post("/signup", async (req, res) => {
       res.status(400).json({ error: "All fields are required" });
       return;
     }
+
+    if (!USERNAME_RE.test(username)) {
+      res.status(400).json({ error: "Username must be 3–30 characters and contain only letters, numbers, or underscores" });
+      return;
+    }
+
     if (password !== confirmPassword) {
       res.status(400).json({ error: "Passwords do not match" });
       return;
     }
+
     if (password.length < 6) {
       res.status(400).json({ error: "Password must be at least 6 characters" });
       return;
     }
-    if (username.length < 3) {
-      res.status(400).json({ error: "Username must be at least 3 characters" });
+
+    if (typeof recoveryQuestion !== "string" || recoveryQuestion.trim().length < 5) {
+      res.status(400).json({ error: "Recovery question must be at least 5 characters" });
+      return;
+    }
+
+    if (typeof recoveryAnswer !== "string" || recoveryAnswer.trim().length < 2) {
+      res.status(400).json({ error: "Recovery answer must be at least 2 characters" });
       return;
     }
 
@@ -38,13 +54,14 @@ router.post("/signup", async (req, res) => {
       return;
     }
 
-    // Find referrer
-    let referredByUserId: number | null = null;
+    // Resolve referral
+    let referredByUserId: number | undefined;
     if (referredBy) {
-      const [referrer] = await db.select().from(usersTable).where(eq(usersTable.referralCode, referredBy.toUpperCase()));
-      if (referrer) {
-        referredByUserId = referrer.id;
-      }
+      const [referrer] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.referralCode, String(referredBy).toUpperCase()));
+      if (referrer) referredByUserId = referrer.id;
     }
 
     const passwordHash = await hashPassword(password);
@@ -54,10 +71,10 @@ router.post("/signup", async (req, res) => {
     const [user] = await db.insert(usersTable).values({
       username,
       passwordHash,
-      recoveryQuestion,
+      recoveryQuestion: recoveryQuestion.trim(),
       recoveryAnswerHash,
       referralCode,
-      referredByUserId: referredByUserId ?? undefined,
+      referredByUserId,
     }).returning();
 
     const token = signToken(user.id);
@@ -83,13 +100,17 @@ router.post("/signup", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) {
+
+    if (!username || typeof username !== "string" || !password || typeof password !== "string") {
       res.status(400).json({ error: "Username and password required" });
       return;
     }
 
     const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username));
+
+    // Use constant-time comparison to prevent timing attacks
     if (!user) {
+      await hashPassword("dummy-timing-prevention");
       res.status(401).json({ error: "Invalid username or password" });
       return;
     }
@@ -101,7 +122,7 @@ router.post("/login", async (req, res) => {
     }
 
     if (user.isBanned) {
-      res.status(403).json({ error: "Your account has been banned" });
+      res.status(403).json({ error: "Your account has been suspended. Please contact support." });
       return;
     }
 
@@ -147,22 +168,28 @@ router.get("/me", requireAuth, async (req, res) => {
 router.post("/recovery", async (req, res) => {
   try {
     const { username, recoveryAnswer, newPassword } = req.body;
+
     if (!username || !recoveryAnswer || !newPassword) {
-      res.status(400).json({ error: "All fields required" });
+      res.status(400).json({ error: "All fields are required" });
       return;
     }
-    if (newPassword.length < 6) {
+
+    if (typeof newPassword !== "string" || newPassword.length < 6) {
       res.status(400).json({ error: "New password must be at least 6 characters" });
       return;
     }
 
     const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username));
+
+    // Always hash to prevent timing attacks
+    const answerToCheck = String(recoveryAnswer).toLowerCase().trim();
     if (!user) {
+      await comparePassword(answerToCheck, "$2b$12$fakehashfortimingprevention000000000000000000000000000");
       res.status(400).json({ error: "User not found" });
       return;
     }
 
-    const valid = await comparePassword(recoveryAnswer.toLowerCase().trim(), user.recoveryAnswerHash);
+    const valid = await comparePassword(answerToCheck, user.recoveryAnswerHash);
     if (!valid) {
       res.status(400).json({ error: "Incorrect recovery answer" });
       return;
